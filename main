@@ -1,0 +1,205 @@
+import customtkinter as ctk
+import json
+import os
+
+MAX_NOTES = 12
+NOTES_FILE = "notes_data.json"
+TEST_FILE = "notes_test.json"
+BUTTON_COLOR = "#008000"
+TEXT_COLOR = "white"
+BG_COLOR = "#2e003e"
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("green")
+
+notes_data = {}
+notes_frames = []
+current_file = NOTES_FILE
+
+def load_notes():
+    global notes_data
+    if os.path.exists(current_file):
+        with open(current_file, "r", encoding="utf-8") as file:
+            try:
+                notes_data = json.load(file)
+            except json.JSONDecodeError:
+                notes_data = {}
+    else:
+        notes_data = {}
+
+def save_notes():
+    with open(current_file, "w", encoding="utf-8") as file:
+        json.dump(notes_data, file, ensure_ascii=False, indent=2)
+
+def show_message(title, text):
+    win = ctk.CTkToplevel()
+    win.title(title)
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("300x150")
+    win.grab_set()
+
+    label = ctk.CTkLabel(win, text=text, text_color=TEXT_COLOR)
+    label.pack(pady=20)
+    btn = ctk.CTkButton(win, text="OK", fg_color=BUTTON_COLOR, command=win.destroy)
+    btn.pack(pady=10)
+
+def open_note_window(name):
+    win = ctk.CTkToplevel()
+    win.title(name)
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("500x400")
+
+    textbox = ctk.CTkTextbox(win, wrap="word")
+    textbox.pack(expand=True, fill="both", padx=10, pady=10)
+    textbox.insert("1.0", notes_data[name]["content"])
+
+    def save():
+        notes_data[name]["content"] = textbox.get("1.0", "end").strip()
+        save_notes()
+
+    save_button = ctk.CTkButton(win, text="Зберегти", fg_color=BUTTON_COLOR, command=save)
+    save_button.pack(pady=5)
+
+def rename_note(name, frame):
+    win = ctk.CTkToplevel()
+    win.title("Перейменування")
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("300x150")
+    win.grab_set()
+
+    entry = ctk.CTkEntry(win, placeholder_text="Нова назва")
+    entry.pack(pady=20, padx=20)
+
+    def submit():
+        new_name = entry.get()
+        if new_name and new_name not in notes_data:
+            notes_data[new_name] = notes_data.pop(name)
+            update_grid()
+            save_notes()
+            win.destroy()
+        else:
+            show_message("Помилка", "Блокнот з такою назвою вже існує")
+
+    ctk.CTkButton(win, text="OK", fg_color=BUTTON_COLOR, command=submit).pack()
+
+
+def delete_note(name):
+    if name in notes_data:
+        del notes_data[name]
+        update_grid()
+        save_notes()
+
+def delete_all_notes():
+    win = ctk.CTkToplevel()
+    win.title("Очистити всі?")
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("300x150")
+    win.grab_set()
+
+    label = ctk.CTkLabel(win, text="Видалити всі нотатки?", text_color=TEXT_COLOR)
+    label.pack(pady=10)
+
+    def confirm():
+        notes_data.clear()
+        update_grid()
+        save_notes()
+        win.destroy()
+
+    ctk.CTkButton(win, text="Так", fg_color=BUTTON_COLOR, command=confirm).pack(side="left", padx=20, pady=20)
+    ctk.CTkButton(win, text="Ні", fg_color=BUTTON_COLOR, command=win.destroy).pack(side="right", padx=20, pady=20)
+
+def update_grid():
+    for widget in notes_frame.winfo_children():
+        widget.destroy()
+    for idx, name in enumerate(notes_data):
+        frame = ctk.CTkFrame(notes_frame, width=140, height=120, fg_color=BG_COLOR)
+        frame.grid(row=idx//4, column=idx%4, padx=10, pady=10)
+
+        label = ctk.CTkLabel(frame, text=name, text_color=TEXT_COLOR)
+        label.pack(pady=2)
+
+        ctk.CTkButton(frame, text="Відкрити", fg_color=BUTTON_COLOR, command=lambda n=name: open_note_window(n)).pack(pady=1)
+        ctk.CTkButton(frame, text="Перейменувати", fg_color=BUTTON_COLOR, command=lambda n=name, f=frame: rename_note(n, f)).pack(pady=1)
+        ctk.CTkButton(frame, text="Видалити", fg_color=BUTTON_COLOR, command=lambda n=name: delete_note(n)).pack(pady=1)
+
+def create_new_note():
+    if len(notes_data) >= MAX_NOTES:
+        show_message("Преміум", "Досягнуто ліміт. Купи преміум!")
+        return
+
+    win = ctk.CTkToplevel()
+    win.title("Нова назва")
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("300x150")
+    win.grab_set()
+
+    entry = ctk.CTkEntry(win, placeholder_text="Введи назву")
+    entry.pack(pady=20, padx=20)
+
+    def submit():
+        name = entry.get()
+        if name:
+            if name in notes_data:
+                show_message("Помилка", "Блокнот з такою назвою вже є")
+            else:
+                notes_data[name] = {"title": name, "content": ""}
+                update_grid()
+                save_notes()
+                win.destroy()
+
+    ctk.CTkButton(win, text="Створити", fg_color=BUTTON_COLOR, command=submit).pack()
+
+def show_premium():
+    win = ctk.CTkToplevel()
+    win.title("Преміум")
+    win.configure(fg_color=BG_COLOR)
+    win.geometry("400x150")
+    win.grab_set()
+
+    ctk.CTkLabel(win, text="Для перегляду преміуму треба заплатити 15 логіків", text_color=TEXT_COLOR).pack(pady=20)
+    def joke():
+        win.destroy()
+        show_message("Жарт", "Преміуму немає(поки що), це був жарт ")
+    ctk.CTkButton(win, text="OK", fg_color=BUTTON_COLOR, command=joke).pack()
+
+def select_mode():
+    win = ctk.CTk()
+    win.title("Вибір режиму")
+    win.geometry("400x200")
+    win.configure(fg_color=BG_COLOR)
+
+    def choose(file):
+        global current_file
+        current_file = file
+        win.destroy()
+        start_app()
+
+    ctk.CTkButton(win, text="Тест", fg_color=BUTTON_COLOR, command=lambda: choose(TEST_FILE)).pack(pady=20)
+    ctk.CTkButton(win, text="Показ", fg_color=BUTTON_COLOR, command=lambda: choose(NOTES_FILE)).pack(pady=20)
+
+    win.mainloop()
+
+
+def start_app():
+    load_notes()
+
+    global root, notes_frame
+    root = ctk.CTk()
+    root.title("Блокнот")
+    root.geometry("700x600")
+    root.configure(fg_color=BG_COLOR)
+
+    top_panel = ctk.CTkFrame(root, fg_color=BG_COLOR)
+    top_panel.pack(fill="x", pady=10)
+
+    ctk.CTkButton(top_panel, text="+", width=40, height=40, fg_color=BUTTON_COLOR, command=create_new_note).pack(side="left", padx=10)
+    ctk.CTkButton(top_panel, text="Очистити", fg_color=BUTTON_COLOR, command=delete_all_notes).pack(side="left", padx=10)
+    ctk.CTkButton(top_panel, text="★", width=40, fg_color=BUTTON_COLOR, command=show_premium).pack(side="right", padx=10)
+
+    notes_frame = ctk.CTkFrame(root, fg_color=BG_COLOR)
+    notes_frame.pack(expand=True, fill="both", padx=20, pady=10)
+
+    update_grid()
+    root.mainloop()
+
+select_mode()
